@@ -1,3 +1,8 @@
+---
+name: moonbit-extract-spec-test
+description: 从现有的 MoonBit 实现中提取正式规范和完整的测试套件。适用于“从实现中提取规范”、“从代码生成测试”或“为现有包创建规范驱动的测试”等情况。分析现有代码，生成包含 `declare` 关键字存根的 spec.mbt 文件以及组织有序的测试文件（有效/无效）。
+---
+
 # MoonBit 提取规范与测试
 
 ## 概述
