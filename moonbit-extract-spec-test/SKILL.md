@@ -1,95 +1,81 @@
----
-name: moonbit-extract-spec-test
-description: Extract formal spec and comprehensive test suites from existing MoonBit implementations. Use when asked to "extract spec from implementation", "generate tests from code", or "create spec-driven tests for existing package". Analyzes existing code to produce spec.mbt with `declare` keyword stubs and organized test files (valid/invalid).
----
+# MoonBit 提取规范与测试
 
-# MoonBit Extract Spec & Test
+## 概述
+从现有的 MoonBit 实现中反向工程化生成正式的 API 契约（`<pkg>_spec.mbt`）和全面的测试套件。这能够为已编写的代码启用基于规范的测试。
 
-## Overview
+## 适用场景
+- 用户要求“从现有实现中提取规范”
+- 用户希望“为某个包生成基于规范的测试”
+- 用户请求“从代码创建正式的 API 规范”
+- 将遗留代码转换为基于规范的开发工作流
+- 需要记录并测试现有的公共 API 接口
 
-Reverse-engineer a formal API contract (`<pkg>_spec.mbt`) and comprehensive test suites from an existing MoonBit implementation. This enables spec-driven testing for already-written code.
+## 工作流程
 
-## When to Use
+### 1. 分析现有实现
 
-- User asks to "extract spec from existing implementation"
-- User wants to "generate spec-driven tests for a package"
-- User requests "create formal API specification from code"
-- Converting legacy code to spec-driven development workflow
-- Need to document and test existing public API surface
+**识别公共 API 接口：**
+- 列出所有 `pub` 和 `pub(all)` 类型、函数、特征
+- 记录错误类型（子错误）及其变体
+- 记录方法签名和特征实现
+- 识别关键入口点和核心功能
 
-## Workflow
+**检查测试模式（若存在测试）：**
+- 查找现有的测试文件（`*_test.mbt`、`*_wbtest.mbt`）
+- 识别测试覆盖缺口
+- 记录常见的测试场景
 
-### 1. Analyze the Existing Implementation
+### 2. 生成规范文件（`<pkg>_spec.mbt`）
 
-**Identify public API surface:**
+**创建正式的 API 契约：**
+- 对所有公共函数/类型使用 `declare` 关键字
+- 保留实现中完全一致的类型签名
+- 包含带有 `derive(Show, Eq, ToJson)` 的错误类型以支持可测试性
+- 从原始代码中保留文档注释
+- 使用 `declare` 声明的内容无需编写函数体
+- 对测试中需要构造的类型使用 `pub(all)`
+- 对不透明类型使用 `pub`
 
-- List all `pub` and `pub(all)` types, functions, traits
-- Note error types (suberrors) and their variants
-- Document method signatures and trait implementations
-- Identify key entry points and core functionality
-
-**Examine test patterns (if tests exist):**
-
-- Look for existing test files (`*_test.mbt`, `*_wbtest.mbt`)
-- Identify test coverage gaps
-- Note common test scenarios
-
-### 2. Generate the Spec File (`<pkg>_spec.mbt`)
-
-**Create formal API contract:**
-
-- Use the `declare` keyword for all public functions/types
-- Preserve exact type signatures from implementation
-- Include error types with `derive(Show, Eq, ToJson)` for testability
-- Add documentation comments from original code
-- Declarations with `declare` do not have a body
-- Use `pub(all)` for types that need construction in tests
-- Keep `pub` for opaque types
-
-**Example spec structure:**
-
+**规范文件结构示例：**
 ```mbt
 ///|
-/// Error type for parsing operations
+/// 解析操作的错误类型
 pub(all) suberror ParseError {
   InvalidFormat(String)
   UnexpectedEof
 } derive(Show, Eq, ToJson)
 
 ///|
-/// Main data type
+/// 主要数据类型
 declare pub(all) type Toml
 
 ///|
-/// Convert to test JSON format
+/// 转换为测试用 JSON 格式
 declare pub fn Toml::to_test_json(self : Toml) -> Json
 
 ///|
-/// Parse TOML from string
+/// 从字符串解析 TOML
 declare pub fn parse(input : StringView) -> Result[Toml, ParseError]
 ```
 
-### 3. Extract and Organize Test Cases
+### 3. 提取并整理测试用例
 
-**Categorize tests by validity (happy path vs error path):**
+**按有效性分类测试（正常流程 vs 异常流程）：**
 
-**Valid tests** (`<pkg>_valid_test.mbt`):
+**有效测试**（`<pkg>_valid_test.mbt`）：
+- 正常流程：能覆盖核心功能的有效输入
+- 边界情况：边界大小、空输入、最大嵌套层级
+- 兼容性：与真实世界数据或主流实现行为一致的场景
+- 回归测试：针对先前修复的 bug 或已知陷阱的测试
 
-- Happy path: valid inputs that exercise core features
-- Edge cases: boundary sizes, empty inputs, maximum nesting
-- Compatibility: behaviors that match real-world data or dominant implementations
-- Regression: bugs fixed in prior work or known pitfalls
+**无效测试**（`<pkg>_invalid_test.mbt`）：
+- 异常流程：无效输入及预期的错误行为
+- 歧义场景：规范允许多种解释的输入（测试用于确定选定的解释）
+- 格式错误的输入：语法错误、类型不匹配、约束违规
 
-**Invalid tests** (`<pkg>_invalid_test.mbt`):
+### 4. 编写基于规范的测试
 
-- Error path: invalid inputs and required error behavior
-- Ambiguities: inputs where the spec allows multiple interpretations (tests pin down chosen interpretation)
-- Malformed inputs: syntax errors, type mismatches, constraint violations
-
-### 4. Write Spec-Driven Tests
-
-**For valid input tests:**
-
+**有效输入测试示例：**
 ```mbt
 ///|
 test "valid/category/test-name" {
@@ -98,7 +84,7 @@ test "valid/category/test-name" {
     #|
   let toml = match @pkg.parse(toml_text) {
     Ok(toml) => toml
-    Err(error) => fail("Failed to parse: " + error.to_string())
+    Err(error) => fail("解析失败: " + error.to_string())
   }
   json_inspect(toml.to_test_json(), content={
     "key": { "type": "string", "value": "value" }
@@ -106,8 +92,7 @@ test "valid/category/test-name" {
 }
 ```
 
-**For invalid input tests:**
-
+**无效输入测试示例：**
 ```mbt
 ///|
 test "invalid/category/test-name" {
@@ -117,78 +102,70 @@ test "invalid/category/test-name" {
   match @pkg.parse(toml_text) {
     Ok(toml) => {
       let json = toml.to_test_json()
-      fail("Expected parse to fail, got \{json.stringify(indent=2)}")
+      fail("预期解析失败，但得到 \{json.stringify(indent=2)}")
     }
     Err(_) => ()
   }
 }
 ```
 
-### 5. Validate
+### 5. 验证
 
-**Type-check the spec:**
-
+**类型检查规范：**
 ```bash
 moon check
 ```
 
-**Run the tests:**
-
+**运行测试：**
 ```bash
-moon test          # Run all tests
-moon test -u       # Update snapshot tests
+moon test          # 运行所有测试
+moon test -u       # 更新快照测试
 ```
 
-**Verify coverage:**
+**验证覆盖率：**
+- 确保所有公共 API 函数都有对应的测试
+- 检查是否有未测试的错误分支
+- 确认边界情况已覆盖
 
-- Ensure all public API functions have tests
-- Check for untested error paths
-- Confirm edge cases are covered
+## 核心原则
 
-## Key Principles
+### 规范文件规则
+1. **仅声明存根**：所有公共 API 使用 `declare` 关键字（无需函数体）
+2. **精确签名**：与实现的类型签名完全匹配
+3. **错误处理**：包含所有错误类型并添加适当的 derive 宏
+4. **文档说明**：保留或补充文档注释以提升可读性
+5. **测试辅助函数**：包含如 `to_test_json()` 之类的转换函数用于检查
 
-### Spec File Rules
+### 测试组织规则
+1. **黑盒测试**：测试仅使用公共 API（通过 `@pkg.function` 调用）
+2. **快照测试**：对于复杂值优先使用 `json_inspect()`
+3. **清晰命名**：使用描述性的测试名称，如 "valid/arrays/nested" 或 "invalid/keys/empty"
+4. **分类管理**：按有效性分类（`<pkg>_valid_test.mbt` 用于正常流程，`<pkg>_invalid_test.mbt` 用于异常流程）
+5. **块分隔**：使用 `///|` 分隔测试块
 
-1. **Declaration-only stubs**: All public API uses `declare` keyword (no body needed)
-2. **Exact signatures**: Match the implementation's type signatures precisely
-3. **Error handling**: Include all error types with proper derives
-4. **Documentation**: Preserve or add doc comments for clarity
-5. **Test helpers**: Include conversion functions like `to_test_json()` for inspection
+### 测试覆盖率目标
+- **正向用例**：有效输入产生预期输出
+- **反向用例**：无效输入产生相应的错误
+- **边界用例**：边界值、空输入、特殊值
+- **集成测试**：验证功能间协同工作
+- **目标覆盖率**：API 覆盖率达到 80-90%
 
-### Test Organization
+## 提取示例
 
-1. **Black-box testing**: Tests use only public API (call via `@pkg.function`)
-2. **Snapshot testing**: Prefer `json_inspect()` for complex values
-3. **Clear naming**: Use descriptive test names like "valid/arrays/nested" or "invalid/keys/empty"
-4. **Categorization**: Organize by validity (`<pkg>_valid_test.mbt` for happy path, `<pkg>_invalid_test.mbt` for error path)
-5. **Block separation**: Use `///|` to delimit test blocks
-
-### Test Coverage Goals
-
-- **Positive cases**: Valid inputs producing expected outputs
-- **Negative cases**: Invalid inputs producing appropriate errors
-- **Edge cases**: Boundaries, empty inputs, special values
-- **Integration**: Features working together
-- **Aim for 80-90% API coverage**
-
-## Example Extraction
-
-### From Implementation
-
+### 从实现代码提取
 ```mbt
 pub type Config
 
 pub fn Config::parse(text : String) -> Result[Config, String] {
-  // implementation
+  // 实现逻辑
 }
 
 pub fn Config::get_value(self : Config, key : String) -> String? {
-  // implementation
+  // 实现逻辑
 }
 ```
 
-### To Spec
-
+### 生成规范文件
 ```mbt
 ///|
 declare pub type Config
@@ -200,8 +177,7 @@ declare pub fn Config::parse(text : String) -> Result[Config, String]
 declare pub fn Config::get_value(self : Config, key : String) -> String?
 ```
 
-### To Tests
-
+### 生成测试文件
 ```mbt
 ///|
 test "parse valid config" {
@@ -210,7 +186,7 @@ test "parse valid config" {
     Ok(cfg) => {
       inspect(cfg.get_value("key"), content="Some(\"value\")")
     }
-    Err(e) => fail("Parse failed: \{e}")
+    Err(e) => fail("解析失败: \{e}")
   }
 }
 
@@ -218,43 +194,40 @@ test "parse valid config" {
 test "parse invalid config returns error" {
   let result = try? Config::parse("invalid")
   match result {
-    Ok(_) => fail("Should have failed to parse")
+    Ok(_) => fail("解析本应失败但未失败")
     Err(_) => ()
   }
 }
 ```
 
-## Tips
+## 提示
 
-- **Start simple**: Begin with core functionality, add complexity incrementally
-- **Use existing tests**: If tests exist, migrate and enhance them
-- **Iterate**: Run `moon check` frequently to catch type errors early
-- **Update snapshots**: Use `moon test -u` when output format changes
-- **Document reasoning**: Add comments explaining non-obvious test cases
+- **从简入手**：先实现核心功能的规范和测试，再逐步增加复杂度
+- **复用现有测试**：若已有测试，迁移并增强这些测试
+- **迭代开发**：频繁运行 `moon check` 及早发现类型错误
+- **更新快照**：当输出格式变化时使用 `moon test -u`
+- **记录设计思路**：为非显而易见的测试用例添加注释说明原因
 
-## Common Patterns
+## 通用模式
 
-### Testing with Result types
-
+### 测试 Result 类型
 ```mbt
 let result : Result[T, Error] = try? function_call(...)
 match result {
   Ok(value) => inspect(value, content="...")
-  Err(e) => fail("Unexpected error: \{e}")
+  Err(e) => fail("意外错误: \{e}")
 }
 ```
 
-### Testing expected failures
-
+### 测试预期失败的场景
 ```mbt
 match try? function_call(...) {
-  Ok(v) => fail("Expected error, got \{v}")
-  Err(_) => ()  // Success - error was expected
+  Ok(v) => fail("预期出错，但得到 \{v}")
+  Err(_) => ()  // 成功 - 预期的错误已触发
 }
 ```
 
-### Using test JSON format
-
+### 使用测试用 JSON 格式
 ```mbt
 json_inspect(value.to_test_json(), content={
   "field": { "type": "integer", "value": "42" }
