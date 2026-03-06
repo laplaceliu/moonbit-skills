@@ -1,6 +1,6 @@
-## Conditional Compilation
+## 条件编译
 
-Target specific backends/modes in `moon.pkg.json`:
+在`moon.pkg.json`中指定特定的后端/模式：
 
 ```json
 {
@@ -8,79 +8,79 @@ Target specific backends/modes in `moon.pkg.json`:
     "wasm_only.mbt": ["wasm"],
     "js_only.mbt": ["js"],
     "debug_only.mbt": ["debug"],
-    "wasm_or_js.mbt": ["wasm", "js"], // for wasm or js backend
-    "not_js.mbt": ["not", "js"], // for nonjs backend
-    "complex.mbt": ["or", ["and", "wasm", "release"], ["and", "js", "debug"]] // more complex conditions
+    "wasm_or_js.mbt": ["wasm", "js"], // 适用于 wasm 或 js 后端
+    "not_js.mbt": ["not", "js"], // 适用于非 js 后端
+    "complex.mbt": ["or", ["and", "wasm", "release"], ["and", "js", "debug"]] // 更复杂的条件
   }
 }
 ```
 
-**Available conditions:**
+**可用条件：**
 
-- **Backends**: `"wasm"`, `"wasm-gc"`, `"js"`, `"native"`
-- **Build modes**: `"debug"`, `"release"`
-- **Logical operators**: `"and"`, `"or"`, `"not"`
+- **后端**：`"wasm"`、`"wasm-gc"`、`"js"`、`"native"`
+- **构建模式**：`"debug"`、`"release"`
+- **逻辑运算符**：`"and"`、`"or"`、`"not"`
 
-## Link Configuration
+## 链接配置
 
-### Basic Linking
+### 基础链接
 
 ```json
 {
-  "link": true, // Enable linking for this package
-  // OR for advanced cases:
+  "link": true, // 为此包启用链接功能
+  // 或者针对复杂场景：
   "link": {
     "wasm": {
-      "exports": ["hello", "foo:bar"], // Export functions
-      "heap-start-address": 1024, // Memory layout
+      "exports": ["hello", "foo:bar"], // 导出函数
+      "heap-start-address": 1024, // 内存布局
       "import-memory": {
-        // Import external memory
+        // 导入外部内存
         "module": "env",
         "name": "memory"
       },
-      "export-memory-name": "memory" // Export memory with name
+      "export-memory-name": "memory" // 以指定名称导出内存
     },
     "wasm-gc": {
       "exports": ["hello"],
-      "use-js-builtin-string": true, // JS String Builtin support
-      "imported-string-constants": "_" // String namespace
+      "use-js-builtin-string": true, // 启用 JS 字符串内置支持
+      "imported-string-constants": "_" // 字符串命名空间
     },
     "js": {
       "exports": ["hello"],
-      "format": "esm" // "esm", "cjs", or "iife"
+      "format": "esm" // 可选值："esm"、"cjs" 或 "iife"
     },
     "native": {
-      "cc": "gcc", // C compiler
-      "cc-flags": "-O2 -DMOONBIT", // Compile flags
-      "cc-link-flags": "-s" // Link flags
+      "cc": "gcc", // C 编译器
+      "cc-flags": "-O2 -DMOONBIT", // 编译标志
+      "cc-link-flags": "-s" // 链接标志
     }
   }
 }
 ```
 
-## Warning Control
+## 警告控制
 
-Disable specific warnings in `moon.mod.json` or `moon.pkg.json`:
+在`moon.mod.json`或`moon.pkg.json`中禁用特定警告：
 
 ```json
 {
-  "warn-list": "-2-29" // Disable unused variable (2) & unused package (29)
+  "warn-list": "-2-29" // 禁用未使用变量（2）和未使用包（29）警告
 }
 ```
 
-**Common warning numbers:**
+**常见警告编号：**
 
-- `1` - Unused function
-- `2` - Unused variable
-- `11` - Partial pattern matching
-- `12` - Unreachable code
-- `29` - Unused package
+- `1` - 未使用的函数
+- `2` - 未使用的变量
+- `11` - 部分模式匹配
+- `12` - 不可达代码
+- `29` - 未使用的包
 
-Use `moonc build-package -warn-help` to see all available warnings.
+可执行`moonc build-package -warn-help`查看所有可用警告。
 
-## Pre-build Commands
+## 预构建命令
 
-Embed external files as MoonBit code:
+将外部文件嵌入为 MoonBit 代码：
 
 ```json
 {
@@ -90,12 +90,12 @@ Embed external files as MoonBit code:
       "output": "embedded.mbt",
       "command": ":embed -i $input -o $output --name data --text"
     },
-    ... // more embed commands
+    ... // 更多嵌入命令
   ]
 }
 ```
 
-Generated code example:
+生成的代码示例：
 
 ```mbt check
 ///|
