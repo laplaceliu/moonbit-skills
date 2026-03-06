@@ -1,78 +1,60 @@
-# Ownership Semantics and Memory Management
+# 所有权语义与内存管理
+本文档详细介绍所有权转移以及 `moonbit_incref`/`moonbit_decref` 的使用规则。关于 `#borrow`/`#owned` 的基础用法，以及外部对象/字节值模式，请参考《SKILL.md》第二阶段内容。
 
-Detailed reference for ownership transfer and `moonbit_incref`/`moonbit_decref`
-rules. For basic `#borrow`/`#owned` usage and the external object / value-as-bytes
-patterns, see SKILL.md Phase 2.
+## `#owned(param)` 语义
+`#owned` 注解显式声明参数的所有权转移至 C 端。C 端在使用完毕后必须调用 `moonbit_decref()`。不为参数添加所有权注解的写法已被废弃——新代码应显式使用 `#owned(param)`。
 
-## `#owned(param)` Semantics
+**基本类型**（`Int`、`UInt`、`Bool`、`Double`、`Int64`、`UInt64`、`Byte`、`Float`）：按值传递。无所有权相关问题，无需添加注解。
 
-The `#owned` annotation explicitly declares that ownership of the parameter
-transfers to C. C must call `moonbit_decref()` when done. Leaving parameters
-without an ownership annotation is deprecated — new code should use
-`#owned(param)` explicitly.
+**GC 管理的对象**（`Bytes`、`String`、`FixedArray[T]`、外部对象、结构体包装器）：需使用 `#owned` 将所有权转移至 C 端。C 端使用完毕后必须调用 `moonbit_decref()`。
 
-**Primitives** (`Int`, `UInt`, `Bool`, `Double`, `Int64`, `UInt64`, `Byte`,
-`Float`): passed by value. No ownership concerns — no annotation needed.
+**通过 `moonbit_make_external_object`、`moonbit_make_bytes` 等函数在 C 端分配的对象**：C 代码拥有新创建的对象所有权。要么将其返回给 MoonBit（转移所有权），要么在使用完毕后调用 `moonbit_decref()`。从 C 端视角，此类对象应视为 `#owned`。
 
-**GC-managed objects** (`Bytes`, `String`, `FixedArray[T]`, external objects,
-struct wrappers): use `#owned` to transfer ownership to C. C must call
-`moonbit_decref()` when done.
+## 操作对照表
+针对参数的不同操作，需执行的引用计数操作如下：
 
-**Objects allocated in C** via `moonbit_make_external_object`,
-`moonbit_make_bytes`, etc.: the C code owns the newly created object. It must
-either return it to MoonBit (transferring ownership) or call
-`moonbit_decref()` when done. Treat these as `#owned` from the C side.
+**`#borrow` 修饰的参数**：
 
-## Operation Tables
-
-What refcount operations are required for each action on a parameter:
-
-**`#borrow` parameters:**
-
-| Operation | Required action |
+| 操作 | 所需执行的操作 |
 |---|---|
-| Read field/element | nothing |
-| Store into data structure | `moonbit_incref` |
-| Pass to MoonBit function | `moonbit_incref` |
-| Pass to other C function | nothing |
-| Return | `moonbit_incref` |
-| End of scope | nothing |
+| 读取字段/元素 | 无 |
+| 存入数据结构 | 调用 `moonbit_incref` |
+| 传递给 MoonBit 函数 | 调用 `moonbit_incref` |
+| 传递给其他 C 函数 | 无 |
+| 作为返回值返回 | 调用 `moonbit_incref` |
+| 作用域结束 | 无 |
 
-**`#owned` parameters (default if no annotation):**
+**`#owned` 修饰的参数（无注解时默认为此类型）**：
 
-| Operation | Required action |
+| 操作 | 所需执行的操作 |
 |---|---|
-| Read field/element | nothing |
-| Store into data structure | nothing (already owned) |
-| Pass to MoonBit function | `moonbit_incref` |
-| Pass to other C function | nothing |
-| Return | nothing |
-| End of scope (not returned) | `moonbit_decref` |
+| 读取字段/元素 | 无 |
+| 存入数据结构 | 无（已拥有所有权） |
+| 传递给 MoonBit 函数 | 调用 `moonbit_incref` |
+| 传递给其他 C 函数 | 无 |
+| 作为返回值返回 | 无 |
+| 作用域结束（未返回） | 调用 `moonbit_decref` |
 
-Practical rules for `#owned`:
+`#owned` 的实用规则：
+- 函数返回前，必须为每个 `owned` 参数调用且仅调用一次 `moonbit_decref()`。
+- 若要长期存储对象，需在存储结构销毁时调用 `decref`。
+- 所有提前返回的分支都必须确保对所有 `owned` 参数执行 `decref`。
 
-- Call `moonbit_decref()` exactly once per owned parameter before the function returns.
-- If storing the object longer-term, decref when the storage is torn down.
-- Every early-return path must still decref all owned parameters.
-
-Example:
-
+示例：
 ```c
 MOONBIT_FFI_EXPORT
 int32_t
 moonbit_process(void *handle, moonbit_bytes_t data) {
   size_t len = Moonbit_array_length(data);
   int32_t result = lib_process(handle, (const char *)data, len);
-  moonbit_decref(handle);  // Decrement after use
-  moonbit_decref(data);    // Decrement byte data
+  moonbit_decref(handle);  // 使用后递减引用计数
+  moonbit_decref(data);    // 递减字节数据的引用计数
   return result;
 }
 ```
 
-## `Ref[T]` Output Parameters
-
-`Ref[T]` cells let C write values back. Borrow them since C does not retain
-the cell — it only writes into it.
+## `Ref[T]` 输出参数
+`Ref[T]` 单元格允许 C 端回写值。对其使用 `borrow` 修饰，因为 C 端不会持有该单元格的所有权——仅向其中写入值。
 
 ```mbt nocheck
 ///|
@@ -93,29 +75,34 @@ pub fn llvm_get_version() -> (UInt, UInt, UInt) {
 }
 ```
 
-## `moonbit_incref` / `moonbit_decref` Pairing
-
-When C holds a reference to a MoonBit object beyond a single call (e.g., storing
-it in a C struct or passing it to a callback later), use `moonbit_incref` to
-prevent GC collection:
+## `moonbit_incref` / `moonbit_decref` 配对使用
+当 C 端需要在单次调用之外持有 MoonBit 对象的引用时（例如，将其存储在 C 结构体中，或后续传递给回调函数），需调用 `moonbit_incref` 防止对象被垃圾回收（GC）：
 
 ```c
-// Store a MoonBit object in a C struct
+// 将 MoonBit 对象存储到 C 结构体中
 void store_callback(MyState *state, void *moonbit_closure) {
-  moonbit_incref(moonbit_closure);  // prevent GC
+  moonbit_incref(moonbit_closure);  // 防止被 GC 回收
   state->callback = moonbit_closure;
 }
 
-// Release when no longer needed
+// 不再需要时释放
 void clear_callback(MyState *state) {
-  moonbit_decref(state->callback);  // allow GC
+  moonbit_decref(state->callback);  // 允许 GC 回收
   state->callback = NULL;
 }
 ```
 
-Rules:
+规则：
+- 每个 `moonbit_incref` 必须对应一个 `moonbit_decref`。
+- 存储对象前调用 `incref`；存储结构销毁或被覆盖时调用 `decref`。
+- 当 C 端回调 MoonBit 时，垃圾回收（GC）可能触发。需确保所有 C 端持有的 MoonBit 对象在回调调用前都已执行 `incref`。
 
-- Every `moonbit_incref` must have a matching `moonbit_decref`.
-- Incref before storing; decref when the storage is torn down or overwritten.
-- When C calls back into MoonBit, the GC may run. Ensure all C-held MoonBit
-  objects are incref'd before the callback invocation.
+```c
+// 补充示例：回调场景下的引用计数管理
+void trigger_callback(MyState *state) {
+  // 确保回调前对象已被 incref，防止 GC 在回调执行中回收
+  moonbit_incref(state->callback);
+  moonbit_invoke_closure(state->callback);
+  moonbit_decref(state->callback);
+}
+```

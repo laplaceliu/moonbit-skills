@@ -1,24 +1,19 @@
-# Callbacks, FuncRef
+# 回调函数（Callbacks）与函数引用（FuncRef）
 
-Callbacks in C usually have the following two forms:
+C 语言中的回调函数通常有以下两种形式：
+- 同时接收函数指针和回调数据；
+- 仅接收函数指针。
 
-- Takes both a function pointer and callback data;
-- Or takes an function pointer only.
+## 带回调数据的函数指针
 
-## Function pointer with callback data.
+这种情况下，你应当使用“FuncRef + 回调（Callback）”技巧。通过在 MoonBit 侧实现跳板函数（trampoline），你无需自行管理闭包的生命周期。
 
-In this case, you should use the "FuncRef + Callback" trick. By doing the
-trampoline on the MoonBit side, you are free from managing the lifetime of the
-closure yourself.
-
-**C library signature:**
-
+**C 库签名：**
 ```c
 void register_callback(void (*callback)(void*), void *data);
 ```
 
-**MoonBit wrapper:**
-
+**MoonBit 封装层：**
 ```moonbit
 extern "c" fn register_callback_ffi(
   call_closure : FuncRef[(() -> Unit) -> Unit],
@@ -30,18 +25,13 @@ pub fn register_callback(callback : () -> Unit) -> Unit {
 }
 ```
 
-**How it works:**
+**工作原理：**
+- 第一个参数是一个闭合函数（无捕获变量），该函数接收一个闭包并调用它；
+- 第二个参数是你想要传递的实际闭包；
+- C 函数会将 data 参数传入你的闭合函数，这一过程实际上完成了部分应用（partial application）；
+- 该方式适用于所有支持回调数据的 C API（例如：`void *user_data`、`void *ctx`、`void *payload` 等参数）。
 
-- The first parameter is a closed function (no captured variables) that takes a
-  closure and invokes it
-- The second parameter is the actual closure you want to pass
-- The C function calls your closed function with the data parameter, which
-  effectively performs partial application
-- This works with any C API that supports callback data (e.g., `void
-  *user_data`, `void *ctx`, `void *payload`)
-
-**Example with parameters:**
-
+**带参数的示例：**
 ```moonbit
 // C signature: void process_items(int (*callback)(void*, int), void *data);
 extern "c" fn process_items_ffi(
@@ -54,19 +44,16 @@ pub fn process_items(callback : Int -> Int) -> Unit {
 }
 ```
 
-## Function pointer only
+## 仅含函数指针的情况
 
-For callback API that accepts only a function pointer, use `FuncRef[(...) ->
-ReturnType]` instead of closures.
+对于仅接收函数指针的回调 API，应使用 `FuncRef[(...) -> ReturnType]` 而非闭包。
 
-**C side:**
-
+**C 侧代码：**
 ```c
 void (*signal(int sig, void (*func)(int)))(int);
 ```
 
-**MoonBit side:**
-
+**MoonBit 侧代码：**
 ```moonbit
 pub extern "c" fn signal(
   signal : Int,
@@ -74,5 +61,4 @@ pub extern "c" fn signal(
 ) -> FuncRef[(Int) -> Unit] = "moonbit_signal"
 ```
 
-Use `FuncRef` for plain function references; use the closure-as-callback pattern
-when the callback needs captured state.
+总结：普通函数引用使用 `FuncRef`；当回调函数需要捕获状态时，使用“闭包作为回调”的模式。

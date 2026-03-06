@@ -1,21 +1,18 @@
-# Including C Library Sources
+# 引入 C 库源码
 
-How to include C library sources in MoonBit native builds.
+如何在 MoonBit 原生构建中引入 C 库源码。
 
-## Constraint
+## 约束条件
 
-The `moon` toolchain compiles `native-stub` files from the package directory
-only — it does not recurse into subdirectories. All C source files must be in
-the same directory as `moon.pkg`.
+`moon` 工具链仅编译包目录下的 `native-stub` 文件——不会递归进入子目录。所有 C 源文件必须与 `moon.pkg` 位于同一目录。
 
-## Strategies
+## 实现策略
 
-Choose the strategy that matches your library, listed by increasing complexity:
+请根据所用库的情况选择对应策略，以下按复杂度从低到高排序：
 
-### Flat source directory
+### 扁平源码目录
 
-Libraries with a flat source layout (e.g., Lua) need no special handling — copy
-`.c` and `.h` files directly into the package directory:
+对于采用扁平源码布局的库（例如 Lua），无需特殊处理——直接将 `.c` 和 `.h` 文件复制到包目录即可：
 
 ```python
 for file in lua_src_dir.iterdir():
@@ -23,12 +20,11 @@ for file in lua_src_dir.iterdir():
         shutil.copy2(file, package_dir / file.name)
 ```
 
-List them in `native-stub` as-is.
+在 `native-stub` 中按原文件名列出这些文件即可。
 
-### Header-only
+### 仅头文件（Header-only）
 
-`#define` the implementation macro and `#include` the header in your stub file.
-No copying needed.
+在桩文件（stub file）中定义实现宏并引入头文件。无需复制文件。
 
 ```c
 #define STB_IMAGE_IMPLEMENTATION
@@ -36,9 +32,9 @@ No copying needed.
 #include <moonbit.h>
 ```
 
-### System library linking
+### 系统库链接
 
-Include only headers in the stub and supply linker flags in `moon.pkg`:
+仅在桩文件中引入头文件，并在 `moon.pkg` 中提供链接器标志：
 
 ```moonbit
 link(
@@ -49,69 +45,55 @@ link(
 )
 ```
 
-> **Portability warning:** `-I`/`-L`/`-l` flags are GCC/Clang conventions.
-> MSVC's `cl.exe` does not accept them.
+> **可移植性警告**：`-I`/`-L`/`-l` 标志是 GCC/Clang 的约定。
+> MSVC 的 `cl.exe` 不支持这些标志。
 
-### Nested source tree (flattening)
+### 嵌套源码树（扁平化处理）
 
-Libraries with nested directories (e.g., `src/unix/async.c`, `lib/src/parser.c`)
-must be **flattened** into the package directory. See below.
+对于包含嵌套目录的库（例如 `src/unix/async.c`、`lib/src/parser.c`），必须将其**扁平化**到包目录中。详见下文。
 
-## Flattening Nested Source Trees
+## 扁平化嵌套源码树
 
-A flattening script (typically a shell or Python script) should handle three
-concerns:
+扁平化脚本（通常为 Shell 或 Python 脚本）需处理以下三个问题：
 
-### 1. Filename mangling
+### 1. 文件名改写
 
-Copy each source file into the package directory, encoding the original path
-into a flat filename. A common convention is replacing `/` with `#`:
+将每个源文件复制到包目录，并将原始路径编码到扁平文件名中。常用的约定是将 `/` 替换为 `#`：
 
-| Original path | Flattened filename |
+| 原始路径 | 扁平化后的文件名 |
 |---|---|
 | `lib/src/lib.c` | `tree-sitter#lib#src#lib.c` |
 | `src/unix/async.c` | `uv#src#unix#async.c` |
 
-The `#` has no special meaning to `moon` — it simply makes it easy to trace a
-file back to its original location. Use a library-name prefix (e.g.,
-`tree-sitter`, `uv`) to avoid collisions.
+`#` 对 `moon` 无特殊含义——仅用于方便追溯文件的原始位置。建议添加库名前缀（例如 `tree-sitter`、`uv`）以避免文件名冲突。
 
-### 2. Include rewriting
+### 2. 引入语句重写
 
-After flattening, `#include "relative/path.h"` directives become invalid because
-the directory structure is gone. The script should rewrite quoted includes to
-reference the mangled filenames:
+扁平化后，`#include "relative/path.h"` 指令会失效，因为目录结构已不存在。脚本需将带引号的引入语句重写为引用改写后的文件名：
 
 ```c
-// Before (original source)
+// 改写前（原始源码）
 #include "unix/internal.h"
 
-// After (flattened)
+// 改写后（扁平化后）
 #include "uv#src#unix#internal.h"
 ```
 
-Only rewrite quoted includes (`#include "..."`), not system includes (`#include
-<...>`). The script should also recursively copy and flatten any discovered
-headers.
+仅重写带引号的引入语句（`#include "..."`），不要修改系统引入语句（`#include <...>`）。脚本还应递归复制并扁平化所有被引用到的头文件。
 
-### 3. Platform-conditional guards
+### 3. 平台条件编译保护
 
-For cross-platform libraries, different source files are needed per OS. Wrap
-platform-specific file contents in preprocessor guards so all variants can
-coexist in a single `native-stub` list:
+对于跨平台库，不同操作系统需要不同的源文件。将平台相关的文件内容包裹在预处理指令保护块中，这样所有变体都能共存于同一个 `native-stub` 列表中：
 
 ```c
-// uv#src#win#async.c — Windows-only source
+// uv#src#win#async.c —— 仅 Windows 平台的源码
 #if defined(_WIN32)
-/* ... original source with rewritten includes ... */
+/* ... 经过引入语句重写的原始源码 ... */
 #endif
 ```
 
-`moon` compiles all `.c` files on every platform, but the guards ensure only
-relevant code is included.
+`moon` 会在所有平台编译所有 `.c` 文件，但这些保护块能确保只有相关代码会被纳入编译。
 
-### Updating `moon.pkg`
+### 更新 `moon.pkg`
 
-When a library has many source files, the script should also update the
-`native-stub` array in `moon.pkg.json` programmatically to stay in sync with the
-files on disk.
+当一个库包含大量源文件时，脚本应通过编程方式更新 `moon.pkg.json` 中的 `native-stub` 数组，以与磁盘上的文件保持同步。
