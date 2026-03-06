@@ -1,14 +1,14 @@
-## Deriving traits
+## 派生 trait
 
-MoonBit supports deriving a number of builtin traits automatically from the type definition.
+MoonBit 支持从类型定义中自动派生多个内置 trait。
 
-To derive a trait `T`, it is required that all fields used in the type implements `T`.
-For example, deriving `Show` for a struct `struct A { x: T1; y: T2 }` requires both `T1: Show` and `T2: Show`
+要为某个类型派生 trait `T`，要求该类型中使用的所有字段都实现了 `T`。
+例如，为结构体 `struct A { x: T1; y: T2 }` 派生 `Show` trait，需要 `T1: Show` 且 `T2: Show` 同时成立。
 
 ### Show
 
-`derive(Show)` will generate a pretty-printing method for the type.
-The derived format is similar to how the type can be constructed in code.
+`derive(Show)` 会为该类型生成一个美观的打印方法。
+派生后的格式与该类型在代码中的构造方式类似。
 
 ```moonbit
 struct MyStruct {
@@ -39,11 +39,11 @@ test "derive show enum" {
 }
 ```
 
-### Eq and Compare
+### Eq 和 Compare
 
-`derive(Eq)` and `derive(Compare)` will generate the corresponding method for testing equality and comparison.
-Fields are compared in the same order as their definitions.
-For enums, the order between cases ascends in the order of definition.
+`derive(Eq)` 和 `derive(Compare)` 会分别生成用于测试相等性和比较操作的对应方法。
+结构体字段会按照其定义的顺序进行比较。
+对于枚举类型，不同枚举成员之间的比较顺序遵循其定义时的先后顺序（定义越靠前，值越小）。
 
 ```moonbit
 struct DeriveEqCompare {
@@ -113,9 +113,9 @@ test "derive eq_compare enum" {
 
 ### Default
 
-`derive(Default)` will generate a method that returns the default value of the type.
+`derive(Default)` 会生成一个返回该类型默认值的方法。
 
-For structs, the default value is the struct with all fields set as their default value.
+对于结构体，其默认值是所有字段都设置为各自默认值的结构体实例。
 
 ```moonbit
 struct DeriveDefault {
@@ -129,7 +129,7 @@ test "derive default struct" {
 }
 ```
 
-For enums, the default value is the only case that has no parameters.
+对于枚举类型，默认值是唯一一个不带参数的枚举成员。
 
 ```moonbit
 enum DeriveDefaultEnum {
@@ -143,26 +143,26 @@ test "derive default enum" {
 }
 ```
 
-Enums that has no cases or more than one cases without parameters cannot derive `Default`.
+没有任何枚举成员，或者有多个不带参数的枚举成员的枚举类型，无法派生 `Default` trait。
 
-<!-- MANUAL CHECK  should not compile -->
+<!-- 手动检查：以下代码不应编译 -->
 ```moonbit
 enum CannotDerive1 {
     Case1(String)
     Case2(Int)
-} derive(Default) // cannot find a constant constructor as default
+} derive(Default) // 无法找到作为默认值的无参构造函数
 
 enum CannotDerive2 {
     Case1
     Case2
-} derive(Default) // Case1 and Case2 are both candidates as default constructor
+} derive(Default) // Case1 和 Case2 都可作为默认构造函数的候选，产生冲突
 ```
 
 ### Hash
 
-`derive(Hash)` will generate a hash implementation for the type.
-This will allow the type to be used in places that expects a `Hash` implementation,
-for example `HashMap`s and `HashSet`s.
+`derive(Hash)` 会为该类型生成哈希实现。
+这使得该类型可以用在需要 `Hash` 实现的场景中，
+例如 `HashMap` 和 `HashSet`。
 
 ```moonbit
 struct DeriveHash {
@@ -182,13 +182,13 @@ test "derive hash struct" {
 
 ### Arbitrary
 
-`derive(Arbitrary)` will generate random values of the given type.
+`derive(Arbitrary)` 会生成该类型的随机值。
 
-### FromJson and ToJson
+### FromJson 和 ToJson
 
-`derive(FromJson)` and `derive(ToJson)` automatically derives round-trippable method implementations
-used for serializing the type to and from JSON.
-The implementation is mainly for debugging and storing the types in a human-readable format.
+`derive(FromJson)` 和 `derive(ToJson)` 会自动派生可往返（round-trippable）的方法实现，
+用于将类型序列化为 JSON 格式以及从 JSON 格式反序列化。
+该实现主要用于调试，以及将类型以人类可读的格式存储。
 
 ```moonbit
 struct JsonTest1 {
@@ -213,19 +213,19 @@ test "json basic" {
 }
 ```
 
-Both derive directives accept a number of arguments to configure the exact behavior of serialization and deserialization.
+这两个派生指令都接受若干参数，用于配置序列化和反序列化的具体行为。
 
-##### WARNING
-The actual behavior of JSON serialization arguments is unstable.
+##### 警告
+JSON 序列化参数的实际行为尚未稳定。
 
-##### WARNING
-JSON derivation arguments are only for coarse-grained control of the derived format.
-If you need to precisely control how the types are laid out,
-consider **directly implementing the two traits instead**.
+##### 警告
+JSON 派生参数仅用于对派生格式进行粗粒度的控制。
+如果需要精确控制类型的布局方式，
+建议**直接手动实现这两个 trait**。
 
-We have recently deprecated a large number of advanced layout tweaking arguments.
-For such usage and future usage of them, please manually implement the traits.
-The arguments include: `repr`, `case_repr`, `default`, `rename_all`, etc.
+我们近期已弃用了大量用于调整高级布局的参数。
+对于这类场景的使用以及未来可能的使用需求，请手动实现对应的 trait。
+这些弃用的参数包括：`repr`、`case_repr`、`default`、`rename_all` 等。
 
 ```moonbit
 struct JsonTest3 {
@@ -255,11 +255,11 @@ test "json args" {
 }
 ```
 
-#### Enum styles
+#### 枚举序列化风格
 
-There are currently two styles of enum serialization: `legacy` and `flat`,
-which the user must select one using the `style` argument.
-Considering the following enum definition:
+目前枚举有两种序列化风格：`legacy`（传统）和 `flat`（扁平化），
+用户必须通过 `style` 参数选择其中一种。
+以下面的枚举定义为例：
 
 ```moonbit
 enum E {
@@ -269,7 +269,7 @@ enum E {
 }
 ```
 
-With `derive(ToJson(style="legacy"))`, the enum is formatted into:
+使用 `derive(ToJson(style="legacy"))` 时，该枚举会被格式化为：
 
 ```default
 E::One              => { "$tag": "One" }
@@ -277,7 +277,7 @@ E::Uniform(2)       => { "$tag": "Uniform", "0": 2 }
 E::Axes(x=-1, y=1)  => { "$tag": "Axes", "x": -1, "y": 1 }
 ```
 
-With `derive(ToJson(style="flat"))`, the enum is formatted into:
+使用 `derive(ToJson(style="flat"))` 时，该枚举会被格式化为：
 
 ```default
 E::One              => "One"
@@ -285,14 +285,14 @@ E::Uniform(2)       => [ "Uniform", 2 ]
 E::Axes(x=-1, y=1)  => [ "Axes", -1, 1 ]
 ```
 
-##### Deriving `Option`
+##### 为 `Option` 派生
 
-A notable exception is the builtin type `Option[T]`.
-Ideally, it would be interpreted as `T | undefined`, but the issue is that it would be
-impossible to distinguish `Some(None)` and `None` for `Option[Option[T]]`.
+一个值得注意的例外是内置类型 `Option[T]`。
+理想情况下，它应被解析为 `T | undefined`，但问题在于，对于 `Option[Option[T]]` 类型，
+无法区分 `Some(None)` 和 `None` 两种情况。
 
-As a result, it interpreted as `T | undefined` iff it is a direct field
-of a struct, and `[T] | null` otherwise:
+因此，只有当 `Option` 作为结构体的直接字段时，才会被解析为 `T | undefined`；
+其他情况下则解析为 `[T] | null`：
 
 ```moonbit
 struct A {
@@ -318,32 +318,31 @@ test {
 }
 ```
 
-#### Container arguments
+#### 容器参数
 
-- `rename_fields` and `rename_cases` (enum only)
-  batch renames fields (for enums and structs) and enum cases to the given format.
-  Available parameters are:
-  - `lowercase`
-  - `UPPERCASE`
-  - `camelCase`
-  - `PascalCase`
-  - `snake_case`
-  - `SCREAMING_SNAKE_CASE`
-  - `kebab-case`
-  - `SCREAMING-KEBAB-CASE`
+- `rename_fields` 和 `rename_cases`（仅枚举可用）
+  批量将字段（枚举和结构体）或枚举成员重命名为指定格式。
+  支持的参数值包括：
+  - `lowercase`（小写）
+  - `UPPERCASE`（大写）
+  - `camelCase`（小驼峰）
+  - `PascalCase`（大驼峰）
+  - `snake_case`（蛇形命名）
+  - `SCREAMING_SNAKE_CASE`（全大写蛇形）
+  - `kebab-case`（短横线命名）
+  - `SCREAMING-KEBAB-CASE`（全大写短横线）
 
-  Example: `rename_fields = "PascalCase"`
-  for a field named `my_long_field_name`
-  results in `MyLongFieldName`.
+  示例：若字段名为 `my_long_field_name`，设置 `rename_fields = "PascalCase"` 后，
+  该字段会被重命名为 `MyLongFieldName`。
 
-  Renaming assumes the name of fields in `snake_case`
-  and the name of structs/enum cases in `PascalCase`.
-- `cases(...)` (enum only) controls the layout of enum cases.
+  重命名逻辑默认假定字段名初始为 `snake_case` 格式，
+  结构体/枚举成员名初始为 `PascalCase` 格式。
+- `cases(...)`（仅枚举可用）控制枚举成员的布局。
 
-  #### WARNING
-  This might be replaced with case attributes in the future.
+  #### 警告
+  未来该参数可能会被枚举成员属性替代。
 
-  For example, for an enum
+  例如，对于如下枚举：
   ```moonbit
   enum E {
     A(...)
@@ -351,15 +350,15 @@ test {
   }
   ```
 
-  you are able to control each case using `cases(A(...), B(...))`.
+  可以通过 `cases(A(...), B(...))` 来分别控制每个枚举成员的行为。
 
-  See [Case arguments]() below for details.
-- `fields(...)` (struct only) controls the layout of struct fields.
+  具体可参考下文的「成员参数」部分。
+- `fields(...)`（仅结构体可用）控制结构体字段的布局。
 
-  #### WARNING
-  This might be replaced with field attributes in the future.
+  #### 警告
+  未来该参数可能会被字段属性替代。
 
-  For example, for a struct
+  例如，对于如下结构体：
   ```moonbit
   struct S {
     x: Int
@@ -367,20 +366,20 @@ test {
   }
   ```
 
-  you are able to control each field using `fields(x(...), y(...))`
+  可以通过 `fields(x(...), y(...))` 来分别控制每个字段的行为。
 
-  See [Field arguments]() below for details.
+  具体可参考下文的「字段参数」部分。
 
-#### Case arguments
+#### 成员参数
 
-- `rename = "..."` renames this specific case,
-  overriding existing container-wide rename directive if any.
-- `fields(...)` controls the layout of the payload of this case.
-  Note that renaming positional fields are not possible currently.
+- `rename = "..."` 重命名指定的枚举成员，
+  若存在容器级别的重命名指令，该参数会覆盖容器级指令的效果。
+- `fields(...)` 控制该枚举成员负载（payload）的布局。
+  注意：目前暂不支持对位置参数（positional fields）进行重命名。
 
-  See [Field arguments]() below for details.
+  具体可参考下文的「字段参数」部分。
 
-#### Field arguments
+#### 字段参数
 
-- `rename = "..."` renames this specific field,
-  overriding existing container-wide rename directives if any.
+- `rename = "..."` 重命名指定的字段，
+  若存在容器级别的重命名指令，该参数会覆盖容器级指令的效果。

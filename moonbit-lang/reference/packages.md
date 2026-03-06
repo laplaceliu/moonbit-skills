@@ -1,26 +1,26 @@
-## Managing Projects with Packages
+## 使用包管理项目
 
-When developing projects at large scale, the project usually needs to be divided into smaller modular unit that depends on each other.
-More often, it involves using other people's work: most noticeably is the [core](https://github.com/moonbitlang/core), the standard library of MoonBit.
+在进行大规模项目开发时，通常需要将项目拆分为多个相互依赖的较小模块化单元。
+多数情况下，这还会涉及使用他人开发的代码：其中最具代表性的是 MoonBit 的标准库——[core](https://github.com/moonbitlang/core)。
 
-### Packages and modules
+### 包与模块
 
-In MoonBit, the most important unit for code organization is a package, which consists of a number of source code files and a single `moon.pkg.json` configuration file.
-A package can either be a `main` package, consisting a `main` function, or a package that serves as a library, identified by the [`is-main`](../toolchain/moon/package.md#is-main) field.
+在 MoonBit 中，代码组织的核心单元是包（package），一个包由若干源代码文件和唯一的 `moon.pkg.json` 配置文件组成。
+包分为两种类型：一种是包含 `main` 函数的 `main` 包，另一种是作为库使用的包，可通过 [`is-main`](../toolchain/moon/package.md#is-main) 字段标识。
 
-A project, corresponding to a module, consists of multiple packages and a single `moon.mod.json` configuration file.
+一个项目对应一个模块（module），模块由多个包和唯一的 `moon.mod.json` 配置文件构成。
 
-A module is identified by the [`name`](../toolchain/moon/module.md#name) field, which usually consists of two parts, separated by `/`: `user-name/project-name`.
-A package is identified by the relative path to the source root defined by the [`source`](../toolchain/moon/module.md#source-directory) field. The full identifier would be `user-name/project-name/path-to-pkg`.
+模块通过 [`name`](../toolchain/moon/module.md#name) 字段标识，其命名通常包含两部分，以 `/` 分隔：`用户名/项目名`。
+包则通过相对于 [`source`](../toolchain/moon/module.md#source-directory) 字段定义的源码根目录的路径来标识。包的完整标识符格式为 `用户名/项目名/包的路径`。
 
-When using things from another package, the dependency between modules should first be declared inside the `moon.mod.json` by the [`deps`](../toolchain/moon/module.md#dependency-management) field.
-The dependency between packages should then be declared in side the `moon.pkg.json` by the [`import`](../toolchain/moon/package.md#import) field.
+当需要使用其他包中的内容时，首先要在 `moon.mod.json` 的 [`deps`](../toolchain/moon/module.md#dependency-management) 字段中声明模块间的依赖关系。
+随后，还需在 `moon.pkg.json` 的 [`import`](../toolchain/moon/package.md#import) 字段中声明包之间的依赖关系。
 
 <a id="default-alias"></a>
 
-The **default alias** of a package is the last part of the identifier split by `/`.
-One can use `@pkg_alias` to access the imported entities, where `pkg_alias` is either the full identifier or the default alias.
-A custom alias may also be defined with the [`import`](../toolchain/moon/package.md#import) field.
+包的**默认别名**是其标识符按 `/` 分割后的最后一部分。
+开发者可通过 `@包别名` 访问导入的实体，这里的“包别名”可以是包的完整标识符，也可以是默认别名。
+同时，也可通过 [`import`](../toolchain/moon/package.md#import) 字段自定义别名。
 
 ```json
 {
@@ -41,157 +41,150 @@ pub fn add1(x : Int) -> Int {
 }
 ```
 
-#### Internal Packages
+#### 内部包
 
-You can define internal packages that are only available for certain packages.
+你可以定义仅对特定包可见的内部包。
 
-Code in `a/b/c/internal/x/y/z` are only available to packages `a/b/c` and `a/b/c/**`.
+位于 `a/b/c/internal/x/y/z` 路径下的代码，仅对 `a/b/c` 包及其子包（`a/b/c/**`）可见。
 
-#### Using
+#### Using 语法
 
-You can use `using` syntax to import symbols defined in another package.
+可通过 `using` 语法导入其他包中定义的符号。
 
 ```moonbit
 ///|
 pub using @pkgA {incr, trait Trait, type Type}
 ```
 
-By having `pub` modifier, it is considered as reexportation.
+添加 `pub` 修饰符后，该操作会被视为重新导出（reexportation）。
 
-### Access Control
+### 访问控制
 
-MoonBit features a comprehensive access control system that governs which parts of your code are accessible from other packages.
-This system helps maintain encapsulation, information hiding, and clear API boundaries.
-The visibility modifiers apply to functions, variables, types, and traits, allowing fine-grained control over how your code can be used by others.
+MoonBit 提供了完善的访问控制系统，用于管控代码中哪些部分可被其他包访问。
+该系统有助于维护封装性、信息隐藏特性，并清晰界定 API 边界。
+可见性修饰符适用于函数、变量、类型和 trait，支持对代码的外部使用方式进行细粒度控制。
 
-#### Functions
+#### 函数
 
-By default, all function definitions and variable bindings are *invisible* to other packages.
-You can use the `pub` modifier before toplevel `let`/`fn` to make them public.
+默认情况下，所有函数定义和变量绑定对其他包均**不可见**。
+可在顶层 `let`/`fn` 前添加 `pub` 修饰符，将其设为公共可见。
 
-#### Aliases
+#### 别名
 
-By default, [function alias](fundamentals.md#function-alias) and
-[method alias](methods.md#alias-methods-as-functions) follow the
-visibility of the original definition, while
-[type alias](fundamentals.md#type-alias),
-[trait alias](methods.md#trait-alias), [using]() are *invisible* to other
-packages.
+默认情况下，[函数别名](fundamentals.md#function-alias) 和
+[方法别名](methods.md#alias-methods-as-functions) 会继承
+原定义的可见性；而 [类型别名](fundamentals.md#type-alias)、
+[trait 别名](methods.md#trait-alias)、`using` 语法定义的内容，对其他包均**不可见**。
 
-You can add the `pub` modifier before the definition or fill in the `visibility`
-field within the annotation.
+可在别名定义前添加 `pub` 修饰符，或在注解的 `visibility` 字段中配置可见性。
 
-#### Types
+#### 类型
 
-There are four different kinds of visibility for types in MoonBit:
+MoonBit 中的类型有四种不同的可见性：
 
-- Private type: declared with `priv`, completely invisible to the outside world
-- Abstract type: which is the default visibility for types.
+- 私有类型（Private type）：使用 `priv` 声明，对外完全不可见。
+- 抽象类型（Abstract type）：类型的默认可见性。
 
-  Only the name of an abstract type is visible outside, the internal representation of the
-  type is hidden. Making abstract type by default is a design choice to encourage
-  encapsulation and information hiding.
-- Readonly types, declared with `pub`.
+  抽象类型仅对外暴露名称，其内部实现细节被隐藏。将抽象类型设为默认值是一项设计选择，旨在鼓励封装和信息隐藏。
+- 只读类型（Readonly types）：使用 `pub` 声明。
 
-  The internal representation of readonly types are visible outside,
-  but users can only read the values of these types from outside, construction and mutation are not allowed.
-- Fully public types, declared with `pub(all)`.
+  只读类型的内部实现对外可见，但外部仅能读取该类型的值，无法构造或修改。
+- 完全公共类型（Fully public types）：使用 `pub(all)` 声明。
 
-  The outside world can freely construct, read values of these types and modify them if possible.
+  外部可自由构造、读取该类型的值，若类型支持修改，也可对其进行修改。
 
-In addition to the visibility of the type itself, the fields of a public `struct` can be annotated with `priv`,
-which will hide the field from the outside world completely.
-Note that `struct`s with private fields cannot be constructed directly outside,
-but you can update the public fields using the functional struct update syntax.
+除类型本身的可见性外，公共 `struct` 的字段可添加 `priv` 注解，使其对外完全隐藏。
+注意：包含私有字段的 `struct` 无法在外部直接构造，但可通过函数式结构体更新语法修改其公共字段。
 
-Readonly types is a very useful feature, inspired by [private types](https://ocaml.org/manual/5.3/privatetypes.html) in OCaml.
-In short, values of `pub` types can be destructed by pattern matching and the dot syntax, but
-cannot be constructed or mutated in other packages.
+只读类型是一项非常实用的特性，灵感源自 OCaml 中的 [私有类型](https://ocaml.org/manual/5.3/privatetypes.html)。
+简而言之，`pub` 类型的值可通过模式匹配和点语法解构，但无法在其他包中构造或修改。
 
-##### NOTE
-There is no restriction within the same package where `pub` types are defined.
+##### 注意
+在定义 `pub` 类型的同一个包内，不存在上述限制。
 
-<!-- MANUAL CHECK -->
+<!-- 需人工核对 -->
 ```moonbit
-// Package A
+// 包 A
 pub struct RO {
   field: Int
 }
 test {
-  let r = { field: 4 }       // OK
-  let r = { ..r, field: 8 }  // OK
+  let r = { field: 4 }       // 合法
+  let r = { ..r, field: 8 }  // 合法
 }
 
-// Package B
+// 包 B
 fn println(r : RO) -> Unit {
   println("{ field: ")
-  println(r.field)  // OK
+  println(r.field)  // 合法
   println(" }")
 }
 test {
-  let r : RO = { field: 4 }  // ERROR: Cannot create values of the public read-only type RO!
-  let r = { ..r, field: 8 }  // ERROR: Cannot mutate a public read-only field!
+  let r : RO = { field: 4 }  // 错误：无法创建公共只读类型 RO 的值！
+  let r = { ..r, field: 8 }  // 错误：无法修改公共只读字段！
 }
 ```
 
-Access control in MoonBit adheres to the principle that a `pub` type, function, or variable cannot be defined in terms of a private type. This is because the private type may not be accessible everywhere that the `pub` entity is used. MoonBit incorporates sanity checks to prevent the occurrence of use cases that violate this principle.
+MoonBit 的访问控制遵循一项原则：`pub` 类型、函数或变量，不能基于私有类型定义。
+这是因为私有类型可能无法在所有使用该 `pub` 实体的场景中访问。MoonBit 内置了合法性检查，以避免出现违反该原则的使用场景。
 
-<!-- MANUAL CHECK -->
+<!-- 需人工核对 -->
 ```moonbit
 pub(all) type T1
 pub(all) type T2
 priv type T3
 
 pub(all) struct S {
-  x: T1  // OK
-  y: T2  // OK
-  z: T3  // ERROR: public field has private type `T3`!
+  x: T1  // 合法
+  y: T2  // 合法
+  z: T3  // 错误：公共字段使用了私有类型 `T3`！
 }
 
-// ERROR: public function has private parameter type `T3`!
+// 错误：公共函数的参数使用了私有类型 `T3`！
 pub fn f1(_x: T3) -> T1 { ... }
-// ERROR: public function has private return type `T3`!
+// 错误：公共函数的返回值使用了私有类型 `T3`！
 pub fn f2(_x: T1) -> T3 { ... }
-// OK
+// 合法
 pub fn f3(_x: T1) -> T1 { ... }
 
-pub let a: T3 = { ... } // ERROR: public variable has private type `T3`!
+pub let a: T3 = { ... } // 错误：公共变量使用了私有类型 `T3`！
 ```
 
-#### Traits
+#### Trait
 
-There are four visibility for traits, just like `struct` and `enum`: private, abstract, readonly and fully public.
+Trait 的可见性同样分为四种，与 `struct` 和 `enum` 一致：私有、抽象、只读、完全公共。
 
-- Private traits are declared with `priv trait`, and they are completely invisible from outside.
-- Abstract trait is the default visibility. Only the name of the trait is visible from outside, and the methods in the trait are not exposed.
-- Readonly traits are declared with `pub trait`, their methods can be invoked from outside, but only the current package can add new implementation for readonly traits.
-- Fully public traits are declared with `pub(open) trait`, they are open to new implementations outside current package, and their methods can be freely used.
+- 私有 trait：使用 `priv trait` 声明，对外完全不可见。
+- 抽象 trait：默认可见性。仅对外暴露 trait 名称，其内部方法不对外公开。
+- 只读 trait：使用 `pub trait` 声明，外部可调用其方法，但仅当前包可为该 trait 添加新实现。
+- 完全公共 trait：使用 `pub(open) trait` 声明，外部可自由为其添加新实现，且其方法可被任意使用。
 
-Abstract and readonly traits are sealed, because only the package defining the trait can implement them.
-Implementing a sealed (abstract or readonly) trait outside its package result in compiler error.
+抽象 trait 和只读 trait 是“密封”的（sealed），因为仅定义该 trait 的包可实现它。
+在定义包外实现密封 trait 会触发编译器错误。
 
-##### Trait Implementations
+##### Trait 实现
 
-Implementations have independent visibility, just like functions. The type will not be considered having fulfillled the trait outside current package unless the implementation is `pub`.
+Trait 实现的可见性独立于 trait 本身，与函数的可见性规则一致。
+除非实现被标记为 `pub`，否则外部包不会认为该类型实现了对应的 trait。
 
-To make the trait system coherent (i.e. there is a globally unique implementation for every `Type: Trait` pair),
-and prevent third-party packages from modifying behavior of existing programs by accident,
-MoonBit employs the following restrictions on who can define methods/implement traits for types:
+为保证 trait 系统的一致性（即对于每个 `类型: Trait` 组合，全局仅有唯一实现），
+并防止第三方包意外修改已有程序的行为，
+MoonBit 对谁可以为类型定义方法/实现 trait 做出了如下限制：
 
-- *only the package that defines a type can define methods for it*. So one cannot define new methods or override old methods for builtin and foreign types.
-  - there is an exception to this rule: [local methods](methods.md#local-method). Local methods are always private though, so they do not break coherence properties of MoonBit's type system
-- *only the package of the type or the package of the trait can define an implementation*.
-  For example, only `@pkg1` and `@pkg2` are allowed to write `impl @pkg1.Trait for @pkg2.Type`.
+- *仅定义类型的包可为该类型定义方法*。因此，无法为内置类型和外部类型定义新方法或覆盖原有方法。
+  - 该规则有一个例外：[本地方法](methods.md#local-method)。但本地方法始终是私有的，因此不会破坏 MoonBit 类型系统的一致性。
+- *仅类型所属的包或 trait 所属的包可定义 trait 实现*。
+  例如，仅 `@pkg1` 和 `@pkg2` 有权编写 `impl @pkg1.Trait for @pkg2.Type`。
 
-The second rule above allows one to add new functionality to a foreign type by defining a new trait and implementing it.
-This makes MoonBit's trait & method system flexible while enjoying good coherence property.
+上述第二条规则允许开发者通过定义新 trait 并为外部类型实现该 trait，从而为外部类型添加新功能。
+这让 MoonBit 的 trait 和方法系统兼具灵活性与良好的一致性。
 
-##### WARNING
-Currently, an empty trait is implemented automatically.
+##### 注意
+目前，空 trait 会被自动实现。
 
-Here's an example of abstract trait:
+以下是抽象 trait 的示例：
 
-<!-- MANUAL CHECK -->
+<!-- 需人工核对 -->
 ```moonbit
 trait Number {
  op_add(Self, Self) -> Self
@@ -213,7 +206,7 @@ impl Number for Double with op_add(x, y) { x + y }
 impl Number for Double with op_sub(x, y) { x - y }
 ```
 
-From outside this package, users can only see the following:
+从外部包视角，仅能看到以下内容：
 
 ```moonbit
 trait Number
@@ -225,23 +218,22 @@ impl Number for Int
 impl Number for Double
 ```
 
-The author of `Number` can make use of the fact that only `Int` and `Double` can ever implement `Number`,
-because new implementations are not allowed outside.
+`Number` 的开发者可利用“仅 `Int` 和 `Double` 可实现 `Number`”这一特性（因为外部无法添加新实现），灵活设计逻辑。
 
-### Virtual Packages
+### 虚拟包
 
-##### WARNING
-Virtual package is an experimental feature. There may be bugs and undefined behaviors.
+##### 注意
+虚拟包是实验性特性，可能存在 bug 和未定义行为。
 
-You can define virtual packages, which serves as an interface. They can be replaced by specific implementations at build time. Currently virtual packages can only contain plain functions.
+可定义虚拟包作为接口使用，其具体实现可在构建时替换。目前，虚拟包仅支持包含普通函数。
 
-Virtual packages can be useful when swapping different implementations while keeping the code untouched.
+虚拟包可用于在不修改代码的前提下切换不同实现，非常实用。
 
-#### Defining a virtual package
+#### 定义虚拟包
 
-You need to declare it to be a virtual package and define its interface in a MoonBit interface file.
+需先声明该包为虚拟包，并在 MoonBit 接口文件中定义其接口。
 
-Within `moon.pkg.json`, you will need to add field [`virtual`](../toolchain/moon/package.md#declarations) :
+在 `moon.pkg.json` 中，需添加 [`virtual`](../toolchain/moon/package.md#declarations) 字段：
 
 ```json
 {
@@ -251,9 +243,9 @@ Within `moon.pkg.json`, you will need to add field [`virtual`](../toolchain/moon
 }
 ```
 
-The `has-default` indicates whether the virtual package has a default implementation.
+`has-default` 标识该虚拟包是否有默认实现。
 
-Within the package, you will need to add an interface file `pkg.mbti`:
+在包内，需添加接口文件 `pkg.mbti`：
 
 ```moonbit
 package "moonbit-community/language/packages/virtual"
@@ -261,12 +253,12 @@ package "moonbit-community/language/packages/virtual"
 fn log(String) -> Unit
 ```
 
-The first line of the interface file need to be `package "full-package-name"`. Then comes the declarations.
-The `pub` keyword for [access control]() and the function parameter names should be omitted.
+接口文件的第一行必须是 `package "完整包名"`，后续为接口声明。
+[访问控制]() 相关的 `pub` 关键字，以及函数参数名均需省略。
 
-#### Implementing a virtual package
+#### 实现虚拟包
 
-A virtual package can have a default implementation. By defining [`virtual.has-default`](../toolchain/moon/package.md#declarations) as `true`, you can implement the code as usual within the same package.
+虚拟包可提供默认实现。将 [`virtual.has-default`](../toolchain/moon/package.md#declarations) 设为 `true` 后，即可在同一个包内按常规方式编写实现代码。
 
 ```moonbit
 ///|
@@ -275,7 +267,7 @@ pub fn log(s : String) -> Unit {
 }
 ```
 
-A virtual package can also be implemented by a third party. By defining [`implements`](../toolchain/moon/package.md#implementations) as the target package's full name, the compiler can warn you about the missing implementations or the mismatched implementations.
+虚拟包也可由第三方实现。将 [`implements`](../toolchain/moon/package.md#implementations) 字段设为目标包的完整名称后，编译器会对缺失的实现或不匹配的实现给出警告。
 
 ```json
 {
@@ -290,15 +282,15 @@ pub fn log(string : String) -> Unit {
 }
 ```
 
-#### Using a virtual package
+#### 使用虚拟包
 
-To use a virtual package, it's the same as other packages: define [`import`](../toolchain/moon/package.md#import) field in the package where you want to use it.
+使用虚拟包的方式与普通包一致：在要使用该虚拟包的包的配置中，定义 [`import`](../toolchain/moon/package.md#import) 字段即可。
 
-#### Overriding a virtual package
+#### 覆盖虚拟包实现
 
-If a virtual package has a default implementation and that is your choice, there's no extra configurations.
+若虚拟包有默认实现且你希望使用该默认实现，无需额外配置。
 
-Otherwise, you may define the [`overrides`](../toolchain/moon/package.md#overriding-implementations) field by providing an array of implementations that you would like to use.
+否则，可通过定义 [`overrides`](../toolchain/moon/package.md#overriding-implementations) 字段，传入希望使用的实现包数组。
 
 ```json
 {
@@ -310,7 +302,7 @@ Otherwise, you may define the [`overrides`](../toolchain/moon/package.md#overrid
 }
 ```
 
-You should reference the virtual package when using the entities.
+使用虚拟包中的实体时，需引用该虚拟包的标识符：
 
 ```moonbit
 ///|
